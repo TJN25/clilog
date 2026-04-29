@@ -12,6 +12,26 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+var Log = NewLogger(0, "stdout")
+
+func InitializeLogger(verbose int, logFile ...string) error {
+	if Log != nil {
+		if err := Log.Close(); err != nil {
+			return err
+		}
+	}
+
+	Log = NewLogger(verbose, logFile...)
+	return nil
+}
+
+func CloseLogger() error {
+	if Log == nil {
+		return nil
+	}
+	return Log.Close()
+}
+
 var (
 	ErrorStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("9")). // Red
@@ -76,9 +96,11 @@ var logLevelNames = [...]string{
 	"TRACE",  // 5
 }
 
-func (l *LogLevel) Name() string {
-	name := logLevelNames[int(*l)]
-	return name
+func (l LogLevel) Name() string {
+	if int(l) < 0 || int(l) >= len(logLevelNames) {
+		return "UNKNOWN"
+	}
+	return logLevelNames[int(l)]
 }
 
 type StyledText struct {
@@ -97,8 +119,15 @@ type LoggerPanic struct {
 type Logger struct {
 	Level          LogLevel
 	outputFile     *os.File
+	output         io.Writer
 	ShouldColorize bool
+	CodeStyle      CodeStyle
 	mu             sync.Mutex
+}
+
+type CodeStyle struct {
+	Formatter string
+	Style     string
 }
 
 func (l *Logger) Close() error {
@@ -113,6 +142,7 @@ func (l *Logger) Close() error {
 	if l.outputFile != nil {
 		err = l.outputFile.Close()
 		l.outputFile = nil
+		l.output = os.Stdout
 	}
 	return err
 }
@@ -129,6 +159,8 @@ func NewLogger(verbosity int, logFile ...string) *Logger {
 	var err error
 	var colorize bool = true
 
+	target := io.Writer(os.Stdout)
+
 	if len(logFile) > 0 {
 		if logFile[0] != "stdout" && logFile[0] != "" {
 			f, err = os.OpenFile(logFile[0], os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0664)
@@ -136,12 +168,20 @@ func NewLogger(verbosity int, logFile ...string) *Logger {
 				fmt.Fprintf(os.Stderr, "Error opening log file: %s: %v. Defaulting to stdout.\n", logFile[0], err)
 				f = nil
 			}
+			if f != nil {
+				target = f
+			}
 		}
 	}
 
 	l := Logger{
-		Level:          logLevel,
-		outputFile:     f,
+		Level:      logLevel,
+		outputFile: f,
+		output:     target,
+		CodeStyle: CodeStyle{
+			Formatter: "terminal256",
+			Style:     "catppuccin-latte",
+		},
 		ShouldColorize: colorize,
 	}
 	return &l
@@ -387,38 +427,11 @@ func (l *Logger) Fatalln(exitcode int, msg string) {
 }
 
 func (l *Logger) Print(msg string) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	if l.outputFile != nil {
-		_, err := fmt.Fprint(l.outputFile, msg)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Logger: Error writing to log file: %v\nOriginal message: %s", err, msg)
-		}
-	} else {
-		fmt.Print(msg)
-	}
-}
-
-func (l *Logger) printNoLock(msg string) {
-	if l.outputFile != nil {
-		_, err := fmt.Fprint(l.outputFile, msg)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Logger: Error writing to log file: %v\nOriginal message: %s", err, msg)
-		}
-	} else {
-		fmt.Print(msg)
-	}
+	l.writeSelected(msg)
 }
 
 func (l *Logger) Fprint(target io.Writer, msg string) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	_, err := fmt.Fprint(target, msg)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Logger: Error writing to %s: file: %v\nOriginal message: %s", target, err, msg)
-	}
+	l.writeAlt(target, msg)
 }
 
 func (l *Logger) Fprintf(target io.Writer, msg string, args ...interface{}) {
@@ -427,21 +440,7 @@ func (l *Logger) Fprintf(target io.Writer, msg string, args ...interface{}) {
 }
 
 func (l *Logger) Fprintln(target io.Writer, msg string) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	msg += "\n"
-	_, err := fmt.Fprint(target, msg)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Logger: Error writing to %s: file: %v\nOriginal message: %s", target, err, msg)
-	}
-}
-
-func (l *Logger) fPrintNoLock(target io.Writer, msg string) {
-	_, err := fmt.Fprint(target, msg)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Logger: Error writing to %s: file: %v\nOriginal message: %s", target, err, msg)
-	}
+	l.Fprint(target, msg+"\n")
 }
 
 func (l *Logger) Printf(msg string, args ...interface{}) {
@@ -455,15 +454,17 @@ func (l *Logger) Println(msg string) {
 }
 
 func (l *Logger) Rich(lines StructuredTextBlock) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	var b strings.Builder
+
 	for _, line := range lines.Lines {
-		if !l.ShouldColorize || l.outputFile != nil {
-			l.printNoLock(line.Text)
+		if !l.ShouldColorize || !isWriterTTY(l.output) {
+			b.WriteString(line.Text)
 		} else {
-			l.printNoLock(line.Style.Render(line.Text))
+			b.WriteString(line.Style.Render(line.Text))
 		}
 	}
+
+	l.Print(b.String())
 }
 
 func (l *Logger) Richln(lines StructuredTextBlock) {
@@ -473,38 +474,42 @@ func (l *Logger) Richln(lines StructuredTextBlock) {
 }
 
 func (l *Logger) Frich(target io.Writer, lines StructuredTextBlock) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	var b strings.Builder
+
 	for _, line := range lines.Lines {
-		var msg string
 		if !l.ShouldColorize || !isWriterTTY(target) {
-			msg = line.Text
+			b.WriteString(line.Text)
 		} else {
-			msg = line.Style.Render(line.Text)
+			b.WriteString(line.Style.Render(line.Text))
 		}
-		l.fPrintNoLock(target, msg)
 	}
+
+	l.Fprint(target, b.String())
 }
 
 func (l *Logger) Code(msg, language, indent string) {
-	formatter := "terminal256"
-	style := "catppuccin-latte"
+	lines := strings.Split(msg, "\n")
+	for i, line := range lines {
+		if line != "" {
+			lines[i] = indent + line
+		}
+	}
 
-	if !l.ShouldColorize {
+	msg = strings.Join(lines, "\n")
+
+	if !l.ShouldColorize || !isWriterTTY(l.output) {
 		l.Print(msg)
 		return
 	}
-	lines := strings.Split(msg, "\n")
-	newLines := make([]string, 0)
-	for _, line := range lines {
-		if line != "" {
-			line = indent + line
-		}
-		newLines = append(newLines, line)
-	}
-	msg = strings.Join(newLines, "\n")
 
-	_ = quick.Highlight(os.Stdout, msg, language, formatter, style)
+	var b strings.Builder
+	err := quick.Highlight(&b, msg, language, l.CodeStyle.Formatter, l.CodeStyle.Style)
+	if err != nil {
+		l.Print(msg)
+		return
+	}
+
+	l.Print(b.String())
 }
 
 func (l *Logger) Codeln(msg, language, indent string) {
@@ -537,4 +542,157 @@ func isWriterTTY(writer io.Writer) bool {
 		return (stat.Mode() & os.ModeCharDevice) == os.ModeCharDevice
 	}
 	return false
+}
+
+func (l *Logger) writeSelected(msg string) {
+	l.write(l.output, msg)
+}
+
+func (l *Logger) writeAlt(target io.Writer, msg string) {
+	l.write(target, msg)
+}
+
+func (l *Logger) write(target io.Writer, msg string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	_, err := fmt.Fprint(target, msg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Logger: error writing log message: %v\nOriginal message: %s", err, msg)
+	}
+}
+
+// direct calls
+// Package-level logging helpers using the global logger.
+
+func Error(msg string) {
+	Log.Error(msg)
+}
+
+func Errorf(msg string, args ...interface{}) {
+	Log.Errorf(msg, args...)
+}
+
+func Errorln(msg string) {
+	Log.Errorln(msg)
+}
+
+func Warn(msg string) {
+	Log.Warn(msg)
+}
+
+func Warnf(msg string, args ...interface{}) {
+	Log.Warnf(msg, args...)
+}
+
+func Warnln(msg string) {
+	Log.Warnln(msg)
+}
+
+func Info(msg string) {
+	Log.Info(msg)
+}
+
+func Infof(msg string, args ...interface{}) {
+	Log.Infof(msg, args...)
+}
+
+func Infoln(msg string) {
+	Log.Infoln(msg)
+}
+
+func Debug(msg string) {
+	Log.Debug(msg)
+}
+
+func Debugf(msg string, args ...interface{}) {
+	Log.Debugf(msg, args...)
+}
+
+func Debugln(msg string) {
+	Log.Debugln(msg)
+}
+
+func Trace(msg string) {
+	Log.Trace(msg)
+}
+
+func Tracef(msg string, args ...interface{}) {
+	Log.Tracef(msg, args...)
+}
+
+func Traceln(msg string) {
+	Log.Traceln(msg)
+}
+
+func Panic(msg string) {
+	Log.Panic(msg)
+}
+
+func Panicf(msg string, args ...interface{}) {
+	Log.Panicf(msg, args...)
+}
+
+func Panicln(msg string) {
+	Log.Panicln(msg)
+}
+
+func Fatal(exitcode int, msg string) {
+	Log.Fatal(exitcode, msg)
+}
+
+func Fatalf(exitcode int, msg string, args ...interface{}) {
+	Log.Fatalf(exitcode, msg, args...)
+}
+
+func Fatalln(exitcode int, msg string) {
+	Log.Fatalln(exitcode, msg)
+}
+
+func Print(msg string) {
+	Log.Print(msg)
+}
+
+func Printf(msg string, args ...interface{}) {
+	Log.Printf(msg, args...)
+}
+
+func Println(msg string) {
+	Log.Println(msg)
+}
+
+func Fprint(target io.Writer, msg string) {
+	Log.Fprint(target, msg)
+}
+
+func Fprintf(target io.Writer, msg string, args ...interface{}) {
+	Log.Fprintf(target, msg, args...)
+}
+
+func Fprintln(target io.Writer, msg string) {
+	Log.Fprintln(target, msg)
+}
+
+func Rich(lines StructuredTextBlock) {
+	Log.Rich(lines)
+}
+
+func Richln(lines StructuredTextBlock) {
+	Log.Richln(lines)
+}
+
+func Frich(target io.Writer, lines StructuredTextBlock) {
+	Log.Frich(target, lines)
+}
+
+func Code(msg, language, indent string) {
+	Log.Code(msg, language, indent)
+}
+
+func Codeln(msg, language, indent string) {
+	Log.Codeln(msg, language, indent)
+}
+
+func GetErrorPipe() io.Writer {
+	return Log.GetErrorPipe()
 }
