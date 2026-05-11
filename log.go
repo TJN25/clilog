@@ -224,9 +224,7 @@ func (l *Logger) Errorf(msg string, args ...interface{}) {
 
 func (l *Logger) Errorln(msg any) {
 	if l.Level >= LogError {
-		text := fmt.Sprint(msg)
-		text += "\n"
-		l.Error(text)
+		l.Error(fmt.Sprintln(msg))
 	}
 }
 
@@ -243,9 +241,7 @@ func (l *Logger) Warnf(msg string, args ...interface{}) {
 
 func (l *Logger) Warnln(msg any) {
 	if l.Level >= LogWarn {
-		text := fmt.Sprint(msg)
-		text += "\n"
-		l.Warn(text)
+		l.Warn(fmt.Sprintln(msg))
 	}
 }
 
@@ -262,9 +258,7 @@ func (l *Logger) Infof(msg string, args ...interface{}) {
 
 func (l *Logger) Infoln(msg any) {
 	if l.Level >= LogInfo {
-		text := fmt.Sprint(msg)
-		text += "\n"
-		l.Info(text)
+		l.Info(fmt.Sprintln(msg))
 	}
 }
 
@@ -281,9 +275,7 @@ func (l *Logger) Debugf(msg string, args ...interface{}) {
 
 func (l *Logger) Debugln(msg any) {
 	if l.Level >= LogDebug {
-		text := fmt.Sprint(msg)
-		text += "\n"
-		l.Debug(text)
+		l.Debug(fmt.Sprintln(msg))
 	}
 }
 
@@ -300,9 +292,7 @@ func (l *Logger) Tracef(msg string, args ...interface{}) {
 
 func (l *Logger) Traceln(msg any) {
 	if l.Level >= LogTrace {
-		text := fmt.Sprint(msg)
-		text += "\n"
-		l.Trace(text)
+		l.Trace(fmt.Sprintln(msg))
 	}
 }
 
@@ -345,9 +335,7 @@ func (l *Logger) Panicf(msg string, args ...interface{}) {
 }
 
 func (l *Logger) Panicln(msg any) {
-	text := fmt.Sprint(msg)
-	text += "\n"
-	l.Panic(text)
+	l.Panic(fmt.Sprintln(msg))
 }
 
 func (l *Logger) Fatal(exitcode int, msg any) {
@@ -378,9 +366,7 @@ func (l *Logger) Fatalf(exitcode int, msg string, args ...interface{}) {
 }
 
 func (l *Logger) Fatalln(exitcode int, msg any) {
-	text := fmt.Sprint(msg)
-	text += "\n"
-	l.Fatal(exitcode, text)
+	l.Fatal(exitcode, fmt.Sprintln(msg))
 }
 
 func (l *Logger) Print(msg any) {
@@ -399,9 +385,7 @@ func (l *Logger) Fprintf(target io.Writer, msg string, args ...interface{}) {
 }
 
 func (l *Logger) Fprintln(target io.Writer, msg any) {
-	text := fmt.Sprint(msg)
-	text += "\n"
-	l.Fprint(target, text)
+	l.Fprint(target, fmt.Sprintln(msg))
 }
 
 func (l *Logger) Printf(msg string, args ...interface{}) {
@@ -410,9 +394,7 @@ func (l *Logger) Printf(msg string, args ...interface{}) {
 }
 
 func (l *Logger) Println(msg any) {
-	text := fmt.Sprint(msg)
-	text += "\n"
-	l.Print(text)
+	l.Print(fmt.Sprintln(msg))
 }
 
 func (l *Logger) Rich(lines StructuredTextBlock) {
