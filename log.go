@@ -187,15 +187,16 @@ func NewLogger(verbosity int, logFile ...string) *Logger {
 	return &l
 }
 
-func (l *Logger) Error(msg string) {
+func (l *Logger) Error(msg any) {
 	if l.Level >= LogError {
+		text := fmt.Sprint(msg)
 		prefix := StyledText{
 			Text:  "ERROR: ",
 			Style: ErrorStyle,
 		}
 		timeStamp := timeSegment()
 		styledMsg := StyledText{
-			Text:  msg,
+			Text:  text,
 			Style: MessageDefaultStyle,
 		}
 		lines := StructuredTextBlock{
@@ -215,22 +216,24 @@ func (l *Logger) Errorf(msg string, args ...interface{}) {
 	}
 }
 
-func (l *Logger) Errorln(msg string) {
+func (l *Logger) Errorln(msg any) {
 	if l.Level >= LogError {
-		msg += "\n"
-		l.Error(msg)
+		text := fmt.Sprint(msg)
+		text += "\n"
+		l.Error(text)
 	}
 }
 
-func (l *Logger) Warn(msg string) {
+func (l *Logger) Warn(msg any) {
 	if l.Level >= LogWarn {
+		text := fmt.Sprint(msg)
 		prefix := StyledText{
 			Text:  "Warn: ",
 			Style: WarningStyle,
 		}
 		timeStamp := timeSegment()
 		styledMsg := StyledText{
-			Text:  msg,
+			Text:  text,
 			Style: MessageDefaultStyle,
 		}
 		lines := StructuredTextBlock{
@@ -250,22 +253,24 @@ func (l *Logger) Warnf(msg string, args ...interface{}) {
 	}
 }
 
-func (l *Logger) Warnln(msg string) {
+func (l *Logger) Warnln(msg any) {
 	if l.Level >= LogWarn {
-		msg += "\n"
-		l.Warn(msg)
+		text := fmt.Sprint(msg)
+		text += "\n"
+		l.Warn(text)
 	}
 }
 
-func (l *Logger) Info(msg string) {
+func (l *Logger) Info(msg any) {
 	if l.Level >= LogInfo {
+		text := fmt.Sprint(msg)
 		prefix := StyledText{
 			Text:  "INFO: ",
 			Style: InfoStyle,
 		}
 		timeStamp := timeSegment()
 		styledMsg := StyledText{
-			Text:  msg,
+			Text:  text,
 			Style: MessageDefaultStyle,
 		}
 		lines := StructuredTextBlock{
@@ -282,22 +287,24 @@ func (l *Logger) Infof(msg string, args ...interface{}) {
 	}
 }
 
-func (l *Logger) Infoln(msg string) {
+func (l *Logger) Infoln(msg any) {
 	if l.Level >= LogInfo {
-		msg += "\n"
-		l.Info(msg)
+		text := fmt.Sprint(msg)
+		text += "\n"
+		l.Info(text)
 	}
 }
 
-func (l *Logger) Debug(msg string) {
+func (l *Logger) Debug(msg any) {
 	if l.Level >= LogDebug {
+		text := fmt.Sprint(msg)
 		prefix := StyledText{
 			Text:  "DEBUG: ",
 			Style: DebugStyle,
 		}
 		timeStamp := timeSegment()
 		styledMsg := StyledText{
-			Text:  msg,
+			Text:  text,
 			Style: MessageDefaultStyle,
 		}
 		lines := StructuredTextBlock{
@@ -314,22 +321,24 @@ func (l *Logger) Debugf(msg string, args ...interface{}) {
 	}
 }
 
-func (l *Logger) Debugln(msg string) {
+func (l *Logger) Debugln(msg any) {
 	if l.Level >= LogDebug {
-		msg += "\n"
-		l.Debug(msg)
+		text := fmt.Sprint(msg)
+		text += "\n"
+		l.Debug(text)
 	}
 }
 
-func (l *Logger) Trace(msg string) {
+func (l *Logger) Trace(msg any) {
 	if l.Level >= LogTrace {
+		text := fmt.Sprint(msg)
 		prefix := StyledText{
 			Text:  "TRACE: ",
 			Style: MessageDefaultStyle,
 		}
 		timeStamp := timeSegment()
 		styledMsg := StyledText{
-			Text:  msg,
+			Text:  text,
 			Style: MessageDefaultStyle,
 		}
 		lines := StructuredTextBlock{
@@ -346,16 +355,18 @@ func (l *Logger) Tracef(msg string, args ...interface{}) {
 	}
 }
 
-func (l *Logger) Traceln(msg string) {
+func (l *Logger) Traceln(msg any) {
 	if l.Level >= LogTrace {
-		msg += "\n"
-		l.Trace(msg)
+		text := fmt.Sprint(msg)
+		text += "\n"
+		l.Trace(text)
 	}
 }
 
-func (l *Logger) Panic(msg string) {
+func (l *Logger) Panic(msg any) {
+	text := fmt.Sprint(msg)
 	styledMsg := StyledText{
-		Text:  msg,
+		Text:  text,
 		Style: MessageDefaultStyle,
 	}
 	var lines StructuredTextBlock
@@ -382,7 +393,7 @@ func (l *Logger) Panic(msg string) {
 	}
 	l.Frich(os.Stderr, lines)
 
-	panic(LoggerPanic{Message: msg})
+	panic(LoggerPanic{Message: text})
 }
 
 func (l *Logger) Panicf(msg string, args ...interface{}) {
@@ -390,14 +401,16 @@ func (l *Logger) Panicf(msg string, args ...interface{}) {
 	l.Panic(msg)
 }
 
-func (l *Logger) Panicln(msg string) {
-	msg += "\n"
-	l.Panic(msg)
+func (l *Logger) Panicln(msg any) {
+	text := fmt.Sprint(msg)
+	text += "\n"
+	l.Panic(text)
 }
 
-func (l *Logger) Fatal(exitcode int, msg string) {
+func (l *Logger) Fatal(exitcode int, msg any) {
+	text := fmt.Sprint(msg)
 	styledMsg := StyledText{
-		Text:  msg,
+		Text:  text,
 		Style: MessageDefaultStyle,
 	}
 	var lines StructuredTextBlock
@@ -421,17 +434,20 @@ func (l *Logger) Fatalf(exitcode int, msg string, args ...interface{}) {
 	l.Fatal(exitcode, msg)
 }
 
-func (l *Logger) Fatalln(exitcode int, msg string) {
-	msg += "\n"
-	l.Fatal(exitcode, msg)
+func (l *Logger) Fatalln(exitcode int, msg any) {
+	text := fmt.Sprint(msg)
+	text += "\n"
+	l.Fatal(exitcode, text)
 }
 
-func (l *Logger) Print(msg string) {
-	l.writeSelected(msg)
+func (l *Logger) Print(msg any) {
+	text := fmt.Sprint(msg)
+	l.writeSelected(text)
 }
 
-func (l *Logger) Fprint(target io.Writer, msg string) {
-	l.writeAlt(target, msg)
+func (l *Logger) Fprint(target io.Writer, msg any) {
+	text := fmt.Sprint(msg)
+	l.writeAlt(target, text)
 }
 
 func (l *Logger) Fprintf(target io.Writer, msg string, args ...interface{}) {
@@ -439,8 +455,10 @@ func (l *Logger) Fprintf(target io.Writer, msg string, args ...interface{}) {
 	l.Fprint(target, msg)
 }
 
-func (l *Logger) Fprintln(target io.Writer, msg string) {
-	l.Fprint(target, msg+"\n")
+func (l *Logger) Fprintln(target io.Writer, msg any) {
+	text := fmt.Sprint(msg)
+	text += "\n"
+	l.Fprint(target, text)
 }
 
 func (l *Logger) Printf(msg string, args ...interface{}) {
@@ -448,9 +466,10 @@ func (l *Logger) Printf(msg string, args ...interface{}) {
 	l.Print(msg)
 }
 
-func (l *Logger) Println(msg string) {
-	msg += "\n"
-	l.Print(msg)
+func (l *Logger) Println(msg any) {
+	text := fmt.Sprint(msg)
+	text += "\n"
+	l.Print(text)
 }
 
 func (l *Logger) Rich(lines StructuredTextBlock) {
@@ -565,7 +584,7 @@ func (l *Logger) write(target io.Writer, msg string) {
 // direct calls
 // Package-level logging helpers using the global logger.
 
-func Error(msg string) {
+func Error(msg any) {
 	Log.Error(msg)
 }
 
@@ -573,11 +592,11 @@ func Errorf(msg string, args ...interface{}) {
 	Log.Errorf(msg, args...)
 }
 
-func Errorln(msg string) {
+func Errorln(msg any) {
 	Log.Errorln(msg)
 }
 
-func Warn(msg string) {
+func Warn(msg any) {
 	Log.Warn(msg)
 }
 
@@ -585,11 +604,11 @@ func Warnf(msg string, args ...interface{}) {
 	Log.Warnf(msg, args...)
 }
 
-func Warnln(msg string) {
+func Warnln(msg any) {
 	Log.Warnln(msg)
 }
 
-func Info(msg string) {
+func Info(msg any) {
 	Log.Info(msg)
 }
 
@@ -597,11 +616,11 @@ func Infof(msg string, args ...interface{}) {
 	Log.Infof(msg, args...)
 }
 
-func Infoln(msg string) {
+func Infoln(msg any) {
 	Log.Infoln(msg)
 }
 
-func Debug(msg string) {
+func Debug(msg any) {
 	Log.Debug(msg)
 }
 
@@ -609,11 +628,11 @@ func Debugf(msg string, args ...interface{}) {
 	Log.Debugf(msg, args...)
 }
 
-func Debugln(msg string) {
+func Debugln(msg any) {
 	Log.Debugln(msg)
 }
 
-func Trace(msg string) {
+func Trace(msg any) {
 	Log.Trace(msg)
 }
 
@@ -621,11 +640,11 @@ func Tracef(msg string, args ...interface{}) {
 	Log.Tracef(msg, args...)
 }
 
-func Traceln(msg string) {
+func Traceln(msg any) {
 	Log.Traceln(msg)
 }
 
-func Panic(msg string) {
+func Panic(msg any) {
 	Log.Panic(msg)
 }
 
@@ -633,11 +652,11 @@ func Panicf(msg string, args ...interface{}) {
 	Log.Panicf(msg, args...)
 }
 
-func Panicln(msg string) {
+func Panicln(msg any) {
 	Log.Panicln(msg)
 }
 
-func Fatal(exitcode int, msg string) {
+func Fatal(exitcode int, msg any) {
 	Log.Fatal(exitcode, msg)
 }
 
@@ -645,11 +664,11 @@ func Fatalf(exitcode int, msg string, args ...interface{}) {
 	Log.Fatalf(exitcode, msg, args...)
 }
 
-func Fatalln(exitcode int, msg string) {
+func Fatalln(exitcode int, msg any) {
 	Log.Fatalln(exitcode, msg)
 }
 
-func Print(msg string) {
+func Print(msg any) {
 	Log.Print(msg)
 }
 
@@ -657,11 +676,11 @@ func Printf(msg string, args ...interface{}) {
 	Log.Printf(msg, args...)
 }
 
-func Println(msg string) {
+func Println(msg any) {
 	Log.Println(msg)
 }
 
-func Fprint(target io.Writer, msg string) {
+func Fprint(target io.Writer, msg any) {
 	Log.Fprint(target, msg)
 }
 
@@ -669,7 +688,7 @@ func Fprintf(target io.Writer, msg string, args ...interface{}) {
 	Log.Fprintf(target, msg, args...)
 }
 
-func Fprintln(target io.Writer, msg string) {
+func Fprintln(target io.Writer, msg any) {
 	Log.Fprintln(target, msg)
 }
 
