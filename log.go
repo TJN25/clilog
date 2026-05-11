@@ -68,7 +68,7 @@ var (
 			Foreground(lipgloss.Color("12")) // Blue
 
 	TraceStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("11")). // Yellow
+			Foreground(lipgloss.AdaptiveColor{Light: "#707070", Dark: "#707070"}).
 			Bold(true)
 
 	TimestampStyle = lipgloss.NewStyle().
