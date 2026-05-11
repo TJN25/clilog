@@ -16,6 +16,7 @@ var Log = NewLogger(0, "stdout")
 
 func InitializeLogger(verbose int, logFile ...string) error {
 	if Log != nil {
+		// Keep the existing logger if closing it fails; the caller can decide how to handle that.
 		if err := Log.Close(); err != nil {
 			return err
 		}
@@ -67,7 +68,7 @@ var (
 			Foreground(lipgloss.Color("12")) // Blue
 
 	TraceStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("11")). // Red
+			Foreground(lipgloss.Color("11")). // Yellow
 			Bold(true)
 
 	TimestampStyle = lipgloss.NewStyle().
@@ -130,6 +131,29 @@ type CodeStyle struct {
 	Style     string
 }
 
+func (l *Logger) log(level LogLevel, label string, style lipgloss.Style, msg any) {
+	if l.Level < level {
+		return
+	}
+
+	lines := StructuredTextBlock{
+		Lines: []StyledText{
+			{Text: label, Style: style},
+			timeSegment(),
+			{Text: fmt.Sprint(msg), Style: MessageDefaultStyle},
+		},
+	}
+
+	if level == LogError || level == LogWarn {
+		if l.outputFile != nil {
+			l.Rich(lines)
+		}
+		l.Frich(os.Stderr, lines)
+		return
+	}
+	l.Rich(lines)
+}
+
 func (l *Logger) Close() error {
 	if l == nil {
 		return nil
@@ -188,25 +212,7 @@ func NewLogger(verbosity int, logFile ...string) *Logger {
 }
 
 func (l *Logger) Error(msg any) {
-	if l.Level >= LogError {
-		text := fmt.Sprint(msg)
-		prefix := StyledText{
-			Text:  "ERROR: ",
-			Style: ErrorStyle,
-		}
-		timeStamp := timeSegment()
-		styledMsg := StyledText{
-			Text:  text,
-			Style: MessageDefaultStyle,
-		}
-		lines := StructuredTextBlock{
-			Lines: []StyledText{prefix, timeStamp, styledMsg},
-		}
-		if l.outputFile != nil {
-			l.Frich(l.outputFile, lines)
-		}
-		l.Frich(os.Stderr, lines)
-	}
+	l.log(LogError, "ERROR: ", ErrorStyle, msg)
 }
 
 func (l *Logger) Errorf(msg string, args ...interface{}) {
@@ -225,25 +231,7 @@ func (l *Logger) Errorln(msg any) {
 }
 
 func (l *Logger) Warn(msg any) {
-	if l.Level >= LogWarn {
-		text := fmt.Sprint(msg)
-		prefix := StyledText{
-			Text:  "Warn: ",
-			Style: WarningStyle,
-		}
-		timeStamp := timeSegment()
-		styledMsg := StyledText{
-			Text:  text,
-			Style: MessageDefaultStyle,
-		}
-		lines := StructuredTextBlock{
-			Lines: []StyledText{prefix, timeStamp, styledMsg},
-		}
-		if l.outputFile != nil {
-			l.Frich(l.outputFile, lines)
-		}
-		l.Frich(os.Stderr, lines)
-	}
+	l.log(LogWarn, "Warn: ", WarningStyle, msg)
 }
 
 func (l *Logger) Warnf(msg string, args ...interface{}) {
@@ -262,22 +250,7 @@ func (l *Logger) Warnln(msg any) {
 }
 
 func (l *Logger) Info(msg any) {
-	if l.Level >= LogInfo {
-		text := fmt.Sprint(msg)
-		prefix := StyledText{
-			Text:  "INFO: ",
-			Style: InfoStyle,
-		}
-		timeStamp := timeSegment()
-		styledMsg := StyledText{
-			Text:  text,
-			Style: MessageDefaultStyle,
-		}
-		lines := StructuredTextBlock{
-			Lines: []StyledText{prefix, timeStamp, styledMsg},
-		}
-		l.Rich(lines)
-	}
+	l.log(LogInfo, "INFO: ", InfoStyle, msg)
 }
 
 func (l *Logger) Infof(msg string, args ...interface{}) {
@@ -296,22 +269,7 @@ func (l *Logger) Infoln(msg any) {
 }
 
 func (l *Logger) Debug(msg any) {
-	if l.Level >= LogDebug {
-		text := fmt.Sprint(msg)
-		prefix := StyledText{
-			Text:  "DEBUG: ",
-			Style: DebugStyle,
-		}
-		timeStamp := timeSegment()
-		styledMsg := StyledText{
-			Text:  text,
-			Style: MessageDefaultStyle,
-		}
-		lines := StructuredTextBlock{
-			Lines: []StyledText{prefix, timeStamp, styledMsg},
-		}
-		l.Rich(lines)
-	}
+	l.log(LogDebug, "DEBUG: ", DebugStyle, msg)
 }
 
 func (l *Logger) Debugf(msg string, args ...interface{}) {
@@ -330,22 +288,7 @@ func (l *Logger) Debugln(msg any) {
 }
 
 func (l *Logger) Trace(msg any) {
-	if l.Level >= LogTrace {
-		text := fmt.Sprint(msg)
-		prefix := StyledText{
-			Text:  "TRACE: ",
-			Style: MessageDefaultStyle,
-		}
-		timeStamp := timeSegment()
-		styledMsg := StyledText{
-			Text:  text,
-			Style: MessageDefaultStyle,
-		}
-		lines := StructuredTextBlock{
-			Lines: []StyledText{prefix, timeStamp, styledMsg},
-		}
-		l.Rich(lines)
-	}
+	l.log(LogTrace, "TRACE: ", TraceStyle, msg)
 }
 
 func (l *Logger) Tracef(msg string, args ...interface{}) {
