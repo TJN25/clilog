@@ -12,6 +12,7 @@ It is designed for command-line tools that want readable terminal output without
 - **Output routing:**
   - `Error`, `Warn`, `Panic`, and `Fatal` write to `stderr`
   - if a log file is configured, those messages are also written to the file
+  - `PrintErr` and `RichErr` provide the same routing without adding a log label or timestamp
   - `Info`, `Debug`, `Trace`, `Print`, `Rich`, and `Code` write to the selected logger output
 - **Terminal styling:** uses Lip Gloss styles for readable CLI output
 - **TTY-aware output:** avoids ANSI styling when writing to files or non-terminal targets
@@ -123,9 +124,12 @@ When a log file is configured, normal output goes to the file.
 
 Errors and warnings are treated specially: they are written to stderr, and also written to the log file when one is configured.
 
+For user-facing diagnostic output that belongs on stderr but is not an error-level log message, use the `PrintErr` family. It writes to stderr and also copies the unlabelled message to the log file when one is configured.
+
 ```go
 clilog.Info("written to selected output")
 clilog.Error("written to stderr, and also to the log file if configured")
+clilog.PrintErrln("plain diagnostic output on stderr and in the log file")
 ```
 
 For explicit targets, use the `Fprint` family:
@@ -153,6 +157,12 @@ clilog.Rich(block)
 
 ```go
 clilog.Frich(os.Stderr, block)
+```
+
+`RichErr` uses the same stderr-and-log-file routing as `PrintErr`, preserving terminal styling on stderr while writing plain text to the log file:
+
+```go
+clilog.RichErr(block)
 ```
 
 ## Printing code

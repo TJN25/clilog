@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -71,6 +72,35 @@ func readFile(t *testing.T, path string) string {
 	content, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("reading %s: %v", path, err)
+	}
+	return string(content)
+}
+
+func captureStderr(t *testing.T, fn func()) string {
+	t.Helper()
+
+	original := os.Stderr
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("creating stderr pipe: %v", err)
+	}
+	os.Stderr = writer
+
+	defer func() {
+		os.Stderr = original
+		_ = writer.Close()
+		_ = reader.Close()
+	}()
+
+	fn()
+	if err := writer.Close(); err != nil {
+		t.Fatalf("closing stderr writer: %v", err)
+	}
+	os.Stderr = original
+
+	content, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("reading stderr: %v", err)
 	}
 	return string(content)
 }
@@ -310,6 +340,40 @@ func TestPlainPrintMethods(t *testing.T) {
 	}
 }
 
+func TestPrintErrMethods(t *testing.T) {
+	t.Run("stderr only without log file", func(t *testing.T) {
+		logger, selected := newBufferLogger(LogAlways)
+		gotStderr := captureStderr(t, func() {
+			logger.PrintErr("a")
+			logger.PrintErrf("%s", "b")
+			logger.PrintErrln("c")
+		})
+
+		if got, want := gotStderr, "abc\n"; got != want {
+			t.Fatalf("stderr = %q, want %q", got, want)
+		}
+		if got := selected.String(); got != "" {
+			t.Fatalf("selected output = %q, want empty", got)
+		}
+	})
+
+	t.Run("stderr and log file when configured", func(t *testing.T) {
+		logger, path := newFileLogger(t, LogAlways)
+		gotStderr := captureStderr(t, func() {
+			logger.PrintErr("a")
+			logger.PrintErrf("%s", "b")
+			logger.PrintErrln("c")
+		})
+
+		if got, want := gotStderr, "abc\n"; got != want {
+			t.Fatalf("stderr = %q, want %q", got, want)
+		}
+		if got, want := readFile(t, path), "abc\n"; got != want {
+			t.Fatalf("log content = %q, want %q", got, want)
+		}
+	})
+}
+
 func TestConcurrentPrint(t *testing.T) {
 	var buf lockedBuffer
 	logger := &Logger{
@@ -376,6 +440,37 @@ func TestRichMethods(t *testing.T) {
 		logger.Rich(block)
 		if got, want := buf.String(), "hello world"; got != want {
 			t.Fatalf("Rich output = %q, want %q", got, want)
+		}
+	})
+}
+
+func TestRichErr(t *testing.T) {
+	block := StructuredTextBlock{Lines: []StyledText{
+		{Text: "Status: ", Style: lipgloss.NewStyle().Bold(true)},
+		{Text: "failed", Style: lipgloss.NewStyle().Foreground(lipgloss.Color("9"))},
+	}}
+
+	t.Run("stderr only without log file", func(t *testing.T) {
+		logger, selected := newBufferLogger(LogAlways)
+		gotStderr := captureStderr(t, func() { logger.RichErr(block) })
+
+		if got, want := gotStderr, "Status: failed"; got != want {
+			t.Fatalf("stderr = %q, want %q", got, want)
+		}
+		if got := selected.String(); got != "" {
+			t.Fatalf("selected output = %q, want empty", got)
+		}
+	})
+
+	t.Run("stderr and log file when configured", func(t *testing.T) {
+		logger, path := newFileLogger(t, LogAlways)
+		gotStderr := captureStderr(t, func() { logger.RichErr(block) })
+
+		if got, want := gotStderr, "Status: failed"; got != want {
+			t.Fatalf("stderr = %q, want %q", got, want)
+		}
+		if got, want := readFile(t, path), "Status: failed"; got != want {
+			t.Fatalf("log content = %q, want %q", got, want)
 		}
 	})
 }
@@ -669,6 +764,16 @@ func TestPackageLevelHelpers(t *testing.T) {
 	}
 	if got, want := richTarget.String(), "frich"; got != want {
 		t.Fatalf("Frich output = %q, want %q", got, want)
+	}
+
+	gotStderr := captureStderr(t, func() {
+		PrintErr("plain ")
+		PrintErrf("%s", "formatted ")
+		PrintErrln("line")
+		RichErr(StructuredTextBlock{Lines: []StyledText{{Text: "rich error"}}})
+	})
+	if got, want := gotStderr, "plain formatted line\nrich error"; got != want {
+		t.Fatalf("global stderr = %q, want %q", got, want)
 	}
 
 	Error("error")

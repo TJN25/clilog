@@ -397,6 +397,23 @@ func (l *Logger) Println(msg any) {
 	l.Print(fmt.Sprintln(msg))
 }
 
+func (l *Logger) PrintErr(msg any) {
+	text := fmt.Sprint(msg)
+	if l.outputFile != nil {
+		l.Print(text)
+	}
+	l.Fprint(os.Stderr, text)
+}
+
+func (l *Logger) PrintErrf(msg string, args ...interface{}) {
+	msg = fmt.Sprintf(msg, args...)
+	l.PrintErr(msg)
+}
+
+func (l *Logger) PrintErrln(msg any) {
+	l.PrintErr(fmt.Sprintln(msg))
+}
+
 func (l *Logger) Rich(lines StructuredTextBlock) {
 	var b strings.Builder
 
@@ -415,6 +432,13 @@ func (l *Logger) Richln(lines StructuredTextBlock) {
 	newLine := StyledText{Text: "\n", Style: MessageDefaultStyle}
 	lines.Lines = append(lines.Lines, newLine)
 	l.Rich(lines)
+}
+
+func (l *Logger) RichErr(lines StructuredTextBlock) {
+	if l.outputFile != nil {
+		l.Rich(lines)
+	}
+	l.Frich(os.Stderr, lines)
 }
 
 func (l *Logger) Frich(target io.Writer, lines StructuredTextBlock) {
@@ -605,6 +629,18 @@ func Println(msg any) {
 	Log.Println(msg)
 }
 
+func PrintErr(msg any) {
+	Log.PrintErr(msg)
+}
+
+func PrintErrf(msg string, args ...interface{}) {
+	Log.PrintErrf(msg, args...)
+}
+
+func PrintErrln(msg any) {
+	Log.PrintErrln(msg)
+}
+
 func Fprint(target io.Writer, msg any) {
 	Log.Fprint(target, msg)
 }
@@ -623,6 +659,10 @@ func Rich(lines StructuredTextBlock) {
 
 func Richln(lines StructuredTextBlock) {
 	Log.Richln(lines)
+}
+
+func RichErr(lines StructuredTextBlock) {
+	Log.RichErr(lines)
 }
 
 func Frich(target io.Writer, lines StructuredTextBlock) {
